@@ -1,9 +1,10 @@
-import type { BadgeConfig } from "@/lib/badge-utils";
-import { GRADIENT_PRESETS } from "@/lib/badge-utils";
+import type { BadgeConfig, GradientStop } from "@/lib/badge-utils";
+import { GRADIENT_PRESETS, stopsToCss } from "@/lib/badge-utils";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { Plus, Trash2 } from "lucide-react";
 
 type Props = {
   config: BadgeConfig;
@@ -56,12 +57,50 @@ function PaddingRow({
   );
 }
 
+function stopsEqual(a: GradientStop[], b: GradientStop[]) {
+  if (a.length !== b.length) return false;
+  return a.every((s, i) => s.color.toLowerCase() === b[i].color.toLowerCase() && Math.abs(s.pos - b[i].pos) < 0.001);
+}
+
 export function ControlPanel({ config, setConfig }: Props) {
   const update = <K extends keyof BadgeConfig>(key: K, value: BadgeConfig[K]) =>
     setConfig({ ...config, [key]: value });
 
   const updatePadding = (side: keyof BadgeConfig["padding"], value: number) =>
     setConfig({ ...config, padding: { ...config.padding, [side]: value } });
+
+  const updateStop = (index: number, patch: Partial<GradientStop>) => {
+    const next = config.gradientStops.map((s, i) => (i === index ? { ...s, ...patch } : s));
+    setConfig({ ...config, gradientStops: next });
+  };
+
+  const addStop = () => {
+    if (config.gradientStops.length >= 6) return;
+    const sorted = [...config.gradientStops].sort((a, b) => a.pos - b.pos);
+    // Insert in the largest gap
+    let bestGap = 0;
+    let bestPos = 0.5;
+    let bestColor = sorted[0].color;
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const gap = sorted[i + 1].pos - sorted[i].pos;
+      if (gap > bestGap) {
+        bestGap = gap;
+        bestPos = (sorted[i].pos + sorted[i + 1].pos) / 2;
+        bestColor = sorted[i].color;
+      }
+    }
+    setConfig({ ...config, gradientStops: [...config.gradientStops, { color: bestColor, pos: bestPos }] });
+  };
+
+  const removeStop = (index: number) => {
+    if (config.gradientStops.length <= 2) return;
+    setConfig({
+      ...config,
+      gradientStops: config.gradientStops.filter((_, i) => i !== index),
+    });
+  };
+
+  const previewAngle = config.gradientDirection === "horizontal" ? 180 : 90;
 
   return (
     <aside className="flex h-full w-[340px] shrink-0 flex-col gap-7 overflow-y-auto border-r border-border bg-panel p-6">
@@ -131,12 +170,12 @@ export function ControlPanel({ config, setConfig }: Props) {
         <SectionLabel>Gradient Presets</SectionLabel>
         <div className="grid grid-cols-7 gap-2">
           {GRADIENT_PRESETS.map((p) => {
-            const isActive = config.bgStart === p.start && config.bgEnd === p.end;
+            const isActive = stopsEqual(config.gradientStops, p.stops);
             return (
               <button
                 key={p.name}
                 title={p.name}
-                onClick={() => setConfig({ ...config, bgStart: p.start, bgEnd: p.end })}
+                onClick={() => setConfig({ ...config, gradientStops: p.stops.map((s) => ({ ...s })) })}
                 className={cn(
                   "aspect-square rounded-md ring-1 transition-all",
                   isActive
@@ -144,7 +183,7 @@ export function ControlPanel({ config, setConfig }: Props) {
                     : "ring-border hover:scale-105",
                 )}
                 style={{
-                  background: `linear-gradient(180deg, ${p.start}, ${p.end})`,
+                  background: stopsToCss(p.stops, 180),
                 }}
               />
             );
@@ -157,27 +196,41 @@ export function ControlPanel({ config, setConfig }: Props) {
         <SectionLabel>Gradient Preview</SectionLabel>
         <div
           className="h-3 w-full rounded-full ring-1 ring-border"
-          style={{
-            background: `linear-gradient(${
-              config.gradientDirection === "horizontal" ? "180deg" : "90deg"
-            }, ${config.bgStart}, ${config.bgEnd})`,
-          }}
+          style={{ background: stopsToCss(config.gradientStops, previewAngle) }}
         />
       </div>
 
-      {/* Colors */}
+      {/* Gradient Stops (multi-color) */}
       <div className="space-y-3">
-        <SectionLabel>Colors</SectionLabel>
-        <ColorRow
-          label="Background — Start"
-          value={config.bgStart}
-          onChange={(v) => update("bgStart", v)}
-        />
-        <ColorRow
-          label="Background — End"
-          value={config.bgEnd}
-          onChange={(v) => update("bgEnd", v)}
-        />
+        <div className="flex items-center justify-between">
+          <SectionLabel>Gradient Colors</SectionLabel>
+          <button
+            onClick={addStop}
+            disabled={config.gradientStops.length >= 6}
+            className={cn(
+              "mb-3 flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-[10px] uppercase tracking-widest text-muted-foreground transition-all",
+              "hover:border-accent/40 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40",
+            )}
+          >
+            <Plus className="h-3 w-3" /> Add
+          </button>
+        </div>
+        <div className="space-y-2">
+          {config.gradientStops.map((stop, i) => (
+            <StopRow
+              key={i}
+              stop={stop}
+              canRemove={config.gradientStops.length > 2}
+              onChange={(patch) => updateStop(i, patch)}
+              onRemove={() => removeStop(i)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Text color */}
+      <div className="space-y-3">
+        <SectionLabel>Text Color</SectionLabel>
         <ColorRow label="Text" value={config.textColor} onChange={(v) => update("textColor", v)} />
       </div>
 
@@ -197,8 +250,96 @@ export function ControlPanel({ config, setConfig }: Props) {
           onChange={(v) => update("shadowColor", v)}
           disabled={!config.shadowEnabled}
         />
+        <div
+          className={cn(
+            "rounded-md border border-border bg-card px-3 py-2",
+            !config.shadowEnabled && "opacity-50",
+          )}
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[11px] text-muted-foreground">Shadow alpha</span>
+            <span
+              className="text-xs text-foreground"
+              style={{ fontFamily: "var(--font-mono-pixel)", fontSize: "14px" }}
+            >
+              {Math.round(config.shadowAlpha * 100)}%
+            </span>
+          </div>
+          <Slider
+            value={[Math.round(config.shadowAlpha * 100)]}
+            min={0}
+            max={100}
+            step={1}
+            disabled={!config.shadowEnabled}
+            onValueChange={(v) => update("shadowAlpha", v[0] / 100)}
+          />
+        </div>
       </div>
     </aside>
+  );
+}
+
+function StopRow({
+  stop,
+  canRemove,
+  onChange,
+  onRemove,
+}: {
+  stop: GradientStop;
+  canRemove: boolean;
+  onChange: (patch: Partial<GradientStop>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
+      <label className="relative h-7 w-7 shrink-0 cursor-pointer overflow-hidden rounded-full ring-1 ring-border">
+        <span className="absolute inset-0" style={{ backgroundColor: stop.color }} />
+        <input
+          type="color"
+          value={stop.color}
+          onChange={(e) => onChange({ color: e.target.value })}
+          className="absolute inset-0 cursor-pointer opacity-0"
+        />
+      </label>
+      <div className="flex flex-1 flex-col gap-1">
+        <div className="flex items-center justify-between">
+          <input
+            type="text"
+            value={stop.color.toUpperCase()}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (/^#[0-9A-Fa-f]{0,6}$/.test(v)) onChange({ color: v });
+            }}
+            className="w-20 bg-transparent text-xs text-foreground outline-none"
+            style={{ fontFamily: "var(--font-mono-pixel)", fontSize: "14px" }}
+          />
+          <span
+            className="text-[11px] text-muted-foreground"
+            style={{ fontFamily: "var(--font-mono-pixel)", fontSize: "13px" }}
+          >
+            {Math.round(stop.pos * 100)}%
+          </span>
+        </div>
+        <Slider
+          value={[Math.round(stop.pos * 100)]}
+          min={0}
+          max={100}
+          step={1}
+          onValueChange={(v) => onChange({ pos: v[0] / 100 })}
+        />
+      </div>
+      <button
+        onClick={onRemove}
+        disabled={!canRemove}
+        aria-label="Remove color stop"
+        className={cn(
+          "grid h-7 w-7 place-items-center rounded-md border border-border text-muted-foreground transition-all",
+          "hover:border-destructive/60 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-30",
+        )}
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </div>
   );
 }
 
