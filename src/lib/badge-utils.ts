@@ -91,7 +91,22 @@ export type BadgeConfig = {
   shadowColor: string;
   /** 0..1 alpha for the shadow color. */
   shadowAlpha: number;
+  /** Pixel-art corner radius (in logical px). 0 = square. */
+  cornerRadius: number;
 };
+
+/**
+ * Pixel-art quarter-circle mask: for a corner of size r,
+ * returns true if pixel (x,y) within the r×r box should be CUT (transparent).
+ * Uses circle equation so the corner reads as a chunky pixel arc.
+ */
+function isCornerCut(x: number, y: number, r: number): boolean {
+  if (r <= 0) return false;
+  // Distance from the inner-corner pivot to the pixel center.
+  const dx = r - 0.5 - x;
+  const dy = r - 0.5 - y;
+  return dx * dx + dy * dy > (r - 0.5) * (r - 0.5);
+}
 
 /** Convert #rrggbb + alpha (0..1) into rgba() string for canvas fill. */
 export function hexWithAlphaToRgba(hex: string, alpha: number): string {
