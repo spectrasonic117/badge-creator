@@ -111,7 +111,7 @@ export function renderBadge(
   canvas: HTMLCanvasElement,
   cfg: BadgeConfig,
 ): { width: number; height: number } {
-  const { text, padding, gradientDirection, bgStart, bgEnd, textColor, shadowEnabled, shadowColor } = cfg;
+  const { text, padding, gradientDirection, gradientStops, textColor, shadowEnabled, shadowColor, shadowAlpha } = cfg;
   const m = measureText(text);
   const width = padding.l + m.width + padding.r;
   const height = padding.t + m.height + padding.b;
@@ -123,25 +123,28 @@ export function renderBadge(
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, width, height);
 
-  // Background gradient
+  // Background gradient (supports N stops)
   const grad =
     gradientDirection === "horizontal"
       ? ctx.createLinearGradient(0, 0, 0, height)
       : ctx.createLinearGradient(0, 0, width, 0);
-  grad.addColorStop(0, bgStart);
-  grad.addColorStop(1, bgEnd);
+  const stops = [...gradientStops].sort((a, b) => a.pos - b.pos);
+  for (const s of stops) {
+    grad.addColorStop(Math.max(0, Math.min(1, s.pos)), s.color);
+  }
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, width, height);
 
   // Draw text glyphs
   let cx = padding.l;
   const cy = padding.t;
+  const shadowFill = hexWithAlphaToRgba(shadowColor, shadowAlpha);
   for (let i = 0; i < text.length; i++) {
     const g = getGlyph(text[i]);
     const gw = g[0].length;
     // Shadow first (1px down-right) so text overlays cleanly
     if (shadowEnabled) {
-      ctx.fillStyle = shadowColor;
+      ctx.fillStyle = shadowFill;
       for (let y = 0; y < g.length; y++) {
         for (let x = 0; x < gw; x++) {
           if (g[y][x] === "1") {
