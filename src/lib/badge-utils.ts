@@ -126,7 +126,7 @@ export function renderBadge(
   canvas: HTMLCanvasElement,
   cfg: BadgeConfig,
 ): { width: number; height: number } {
-  const { text, padding, gradientDirection, gradientStops, textColor, shadowEnabled, shadowColor, shadowAlpha } = cfg;
+  const { text, padding, gradientDirection, gradientStops, textColor, shadowEnabled, shadowColor, shadowAlpha, cornerRadius } = cfg;
   const m = measureText(text);
   const width = padding.l + m.width + padding.r;
   const height = padding.t + m.height + padding.b;
@@ -177,6 +177,21 @@ export function renderBadge(
       }
     }
     cx += gw + GLYPH_GAP;
+  }
+
+  // Pixel-art rounded corners — clear pixels in the four corners.
+  const r = Math.max(0, Math.min(Math.floor(Math.min(width, height) / 2), Math.floor(cornerRadius)));
+  if (r > 0) {
+    for (let y = 0; y < r; y++) {
+      for (let x = 0; x < r; x++) {
+        if (isCornerCut(x, y, r)) {
+          ctx.clearRect(x, y, 1, 1);                            // top-left
+          ctx.clearRect(width - 1 - x, y, 1, 1);                // top-right
+          ctx.clearRect(x, height - 1 - y, 1, 1);               // bottom-left
+          ctx.clearRect(width - 1 - x, height - 1 - y, 1, 1);   // bottom-right
+        }
+      }
+    }
   }
 
   return { width, height };
