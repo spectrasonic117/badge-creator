@@ -22,7 +22,7 @@ export const Route = createFileRoute("/")({
 
 const DEFAULT_CONFIG: BadgeConfig = {
   text: "ADMIN",
-  padding: { l: 4, r: 4, t: 2, b: 2 },
+  padding: { l: 4, r: 4, t: 1, b: 1 },
   gradientDirection: "horizontal",
   gradientStops: [
     { color: "#FF3333", pos: 0 },

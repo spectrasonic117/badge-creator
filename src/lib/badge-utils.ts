@@ -1,77 +1,3 @@
-// Pixel font (3x5 + some 5-wide glyphs) used to rasterize badge text.
-// Each glyph is an array of rows; "1" = pixel on. We support A-Z, 0-9, basic punctuation.
-
-export type Glyph = string[];
-
-const G: Record<string, Glyph> = {
-  A: ["010", "101", "111", "101", "101"],
-  B: ["110", "101", "110", "101", "110"],
-  C: ["011", "100", "100", "100", "011"],
-  D: ["110", "101", "101", "101", "110"],
-  E: ["111", "100", "110", "100", "111"],
-  F: ["111", "100", "110", "100", "100"],
-  G: ["011", "100", "101", "101", "011"],
-  H: ["101", "101", "111", "101", "101"],
-  I: ["111", "010", "010", "010", "111"],
-  J: ["001", "001", "001", "101", "010"],
-  K: ["101", "101", "110", "101", "101"],
-  L: ["100", "100", "100", "100", "111"],
-  M: ["10001", "11011", "10101", "10001", "10001"],
-  N: ["1001", "1101", "1011", "1001", "1001"],
-  O: ["010", "101", "101", "101", "010"],
-  P: ["110", "101", "110", "100", "100"],
-  Q: ["010", "101", "101", "111", "011"],
-  R: ["110", "101", "110", "101", "101"],
-  S: ["011", "100", "010", "001", "110"],
-  T: ["111", "010", "010", "010", "010"],
-  U: ["101", "101", "101", "101", "111"],
-  V: ["101", "101", "101", "101", "010"],
-  W: ["10001", "10001", "10101", "11011", "10001"],
-  X: ["101", "101", "010", "101", "101"],
-  Y: ["101", "101", "010", "010", "010"],
-  Z: ["111", "001", "010", "100", "111"],
-  "0": ["111", "101", "101", "101", "111"],
-  "1": ["010", "110", "010", "010", "111"],
-  "2": ["110", "001", "010", "100", "111"],
-  "3": ["110", "001", "010", "001", "110"],
-  "4": ["101", "101", "111", "001", "001"],
-  "5": ["111", "100", "110", "001", "110"],
-  "6": ["011", "100", "111", "101", "111"],
-  "7": ["111", "001", "010", "100", "100"],
-  "8": ["111", "101", "111", "101", "111"],
-  "9": ["111", "101", "111", "001", "110"],
-  "+": ["000", "010", "111", "010", "000"],
-  "-": ["000", "000", "111", "000", "000"],
-  "_": ["000", "000", "000", "000", "111"],
-  "!": ["1", "1", "1", "0", "1"],
-  "?": ["110", "001", "010", "000", "010"],
-  ".": ["0", "0", "0", "0", "1"],
-  ",": ["00", "00", "00", "01", "10"],
-  "*": ["101", "010", "111", "010", "101"],
-  "#": ["00000", "01010", "11111", "01010", "11111"],
-  "/": ["001", "001", "010", "100", "100"],
-  ":": ["0", "1", "0", "1", "0"],
-  " ": ["00", "00", "00", "00", "00"],
-};
-
-export const GLYPH_HEIGHT = 5;
-export const GLYPH_GAP = 1;
-
-export function getGlyph(ch: string): Glyph {
-  return G[ch.toUpperCase()] ?? G["?"];
-}
-
-export function measureText(text: string): { width: number; height: number } {
-  if (!text.length) return { width: 0, height: GLYPH_HEIGHT };
-  let w = 0;
-  for (let i = 0; i < text.length; i++) {
-    const g = getGlyph(text[i]);
-    w += g[0].length;
-    if (i < text.length - 1) w += GLYPH_GAP;
-  }
-  return { width: w, height: GLYPH_HEIGHT };
-}
-
 export type GradientStop = {
   /** hex color #rrggbb */
   color: string;
@@ -94,6 +20,23 @@ export type BadgeConfig = {
   /** Pixel-art corner radius (in logical px). 0 = square. */
   cornerRadius: number;
 };
+
+/**
+ * Measure text using Tiny5 font at given size.
+ */
+export function measureText(
+  text: string,
+  fontSize: number = 8,
+): { width: number; height: number } {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d")!;
+  ctx.font = `${fontSize}px Tiny5`;
+  const metrics = ctx.measureText(text);
+  return {
+    width: Math.ceil(metrics.width),
+    height: fontSize,
+  };
+}
 
 /**
  * Pixel-art quarter-circle mask: for a corner of size r,
@@ -126,8 +69,19 @@ export function renderBadge(
   canvas: HTMLCanvasElement,
   cfg: BadgeConfig,
 ): { width: number; height: number } {
-  const { text, padding, gradientDirection, gradientStops, textColor, shadowEnabled, shadowColor, shadowAlpha, cornerRadius } = cfg;
-  const m = measureText(text);
+  const {
+    text,
+    padding,
+    gradientDirection,
+    gradientStops,
+    textColor,
+    shadowEnabled,
+    shadowColor,
+    shadowAlpha,
+    cornerRadius,
+  } = cfg;
+  const fontSize = 8;
+  const m = measureText(text, fontSize);
   const width = padding.l + m.width + padding.r;
   const height = padding.t + m.height + padding.b;
 
@@ -150,45 +104,35 @@ export function renderBadge(
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, width, height);
 
-  // Draw text glyphs
-  let cx = padding.l;
-  const cy = padding.t;
-  const shadowFill = hexWithAlphaToRgba(shadowColor, shadowAlpha);
-  for (let i = 0; i < text.length; i++) {
-    const g = getGlyph(text[i]);
-    const gw = g[0].length;
-    // Shadow first (1px down-right) so text overlays cleanly
-    if (shadowEnabled) {
-      ctx.fillStyle = shadowFill;
-      for (let y = 0; y < g.length; y++) {
-        for (let x = 0; x < gw; x++) {
-          if (g[y][x] === "1") {
-            ctx.fillRect(cx + x, cy + y + 1, 1, 1);
-          }
-        }
-      }
-    }
-    ctx.fillStyle = textColor;
-    for (let y = 0; y < g.length; y++) {
-      for (let x = 0; x < gw; x++) {
-        if (g[y][x] === "1") {
-          ctx.fillRect(cx + x, cy + y, 1, 1);
-        }
-      }
-    }
-    cx += gw + GLYPH_GAP;
+  // Draw text using Tiny5 font
+  const textX = padding.l;
+  const textY = padding.t + fontSize - 2;
+
+  // Shadow
+  if (shadowEnabled) {
+    ctx.font = `${fontSize}px Tiny5`;
+    ctx.fillStyle = hexWithAlphaToRgba(shadowColor, shadowAlpha);
+    ctx.fillText(text, textX, textY + 1);
   }
 
+  // Main text
+  ctx.font = `${fontSize}px Tiny5`;
+  ctx.fillStyle = textColor;
+  ctx.fillText(text, textX, textY);
+
   // Pixel-art rounded corners — clear pixels in the four corners.
-  const r = Math.max(0, Math.min(Math.floor(Math.min(width, height) / 2), Math.floor(cornerRadius)));
+  const r = Math.max(
+    0,
+    Math.min(Math.floor(Math.min(width, height) / 2), Math.floor(cornerRadius)),
+  );
   if (r > 0) {
     for (let y = 0; y < r; y++) {
       for (let x = 0; x < r; x++) {
         if (isCornerCut(x, y, r)) {
-          ctx.clearRect(x, y, 1, 1);                            // top-left
-          ctx.clearRect(width - 1 - x, y, 1, 1);                // top-right
-          ctx.clearRect(x, height - 1 - y, 1, 1);               // bottom-left
-          ctx.clearRect(width - 1 - x, height - 1 - y, 1, 1);   // bottom-right
+          ctx.clearRect(x, y, 1, 1); // top-left
+          ctx.clearRect(width - 1 - x, y, 1, 1); // top-right
+          ctx.clearRect(x, height - 1 - y, 1, 1); // bottom-left
+          ctx.clearRect(width - 1 - x, height - 1 - y, 1, 1); // bottom-right
         }
       }
     }
@@ -227,25 +171,106 @@ export function hexToOklch(hex: string): { l: number; c: number; h: number } {
 }
 
 export const GRADIENT_PRESETS: { name: string; stops: GradientStop[] }[] = [
-  { name: "Red", stops: [{ color: "#FF3333", pos: 0 }, { color: "#CC0000", pos: 1 }] },
-  { name: "Orange", stops: [{ color: "#FFA64D", pos: 0 }, { color: "#E66B00", pos: 1 }] },
-  { name: "Yellow", stops: [{ color: "#FFE94D", pos: 0 }, { color: "#E6B800", pos: 1 }] },
-  { name: "Green", stops: [{ color: "#5CE65C", pos: 0 }, { color: "#1F9E1F", pos: 1 }] },
-  { name: "Cyan", stops: [{ color: "#5CE6E6", pos: 0 }, { color: "#0E8C8C", pos: 1 }] },
-  { name: "Blue", stops: [{ color: "#4DA6FF", pos: 0 }, { color: "#1257B5", pos: 1 }] },
-  { name: "Purple", stops: [{ color: "#B266FF", pos: 0 }, { color: "#6A1FB5", pos: 1 }] },
-  { name: "Pink", stops: [{ color: "#FF66CC", pos: 0 }, { color: "#CC1F8E", pos: 1 }] },
-  { name: "White", stops: [{ color: "#FFFFFF", pos: 0 }, { color: "#BFBFBF", pos: 1 }] },
-  { name: "Black", stops: [{ color: "#4D4D4D", pos: 0 }, { color: "#0A0A0A", pos: 1 }] },
-  { name: "Teal", stops: [{ color: "#33D9B2", pos: 0 }, { color: "#0E8068", pos: 1 }] },
-  { name: "Magenta", stops: [{ color: "#FF4DBF", pos: 0 }, { color: "#A31273", pos: 1 }] },
-  { name: "Gold", stops: [{ color: "#FFD24D", pos: 0 }, { color: "#B8860B", pos: 1 }] },
-  { name: "Rainbow", stops: [
-    { color: "#FF3333", pos: 0 },
-    { color: "#FFD24D", pos: 0.33 },
-    { color: "#33D9B2", pos: 0.66 },
-    { color: "#B266FF", pos: 1 },
-  ] },
+  {
+    name: "Red",
+    stops: [
+      { color: "#FF3333", pos: 0 },
+      { color: "#CC0000", pos: 1 },
+    ],
+  },
+  {
+    name: "Orange",
+    stops: [
+      { color: "#FFA64D", pos: 0 },
+      { color: "#E66B00", pos: 1 },
+    ],
+  },
+  {
+    name: "Yellow",
+    stops: [
+      { color: "#FFE94D", pos: 0 },
+      { color: "#E6B800", pos: 1 },
+    ],
+  },
+  {
+    name: "Green",
+    stops: [
+      { color: "#5CE65C", pos: 0 },
+      { color: "#1F9E1F", pos: 1 },
+    ],
+  },
+  {
+    name: "Cyan",
+    stops: [
+      { color: "#5CE6E6", pos: 0 },
+      { color: "#0E8C8C", pos: 1 },
+    ],
+  },
+  {
+    name: "Blue",
+    stops: [
+      { color: "#4DA6FF", pos: 0 },
+      { color: "#1257B5", pos: 1 },
+    ],
+  },
+  {
+    name: "Purple",
+    stops: [
+      { color: "#B266FF", pos: 0 },
+      { color: "#6A1FB5", pos: 1 },
+    ],
+  },
+  {
+    name: "Pink",
+    stops: [
+      { color: "#FF66CC", pos: 0 },
+      { color: "#CC1F8E", pos: 1 },
+    ],
+  },
+  {
+    name: "White",
+    stops: [
+      { color: "#FFFFFF", pos: 0 },
+      { color: "#BFBFBF", pos: 1 },
+    ],
+  },
+  {
+    name: "Black",
+    stops: [
+      { color: "#4D4D4D", pos: 0 },
+      { color: "#0A0A0A", pos: 1 },
+    ],
+  },
+  {
+    name: "Teal",
+    stops: [
+      { color: "#33D9B2", pos: 0 },
+      { color: "#0E8068", pos: 1 },
+    ],
+  },
+  {
+    name: "Magenta",
+    stops: [
+      { color: "#FF4DBF", pos: 0 },
+      { color: "#A31273", pos: 1 },
+    ],
+  },
+  {
+    name: "Gold",
+    stops: [
+      { color: "#FFD24D", pos: 0 },
+      { color: "#B8860B", pos: 1 },
+    ],
+  },
+  {
+    name: "Rainbow",
+    stops: [
+      { color: "#FF3333", pos: 0 },
+      { color: "#FFD24D", pos: 0.33 },
+      { color: "#33D9B2", pos: 0.66 },
+      { color: "#B266FF", pos: 1 },
+    ],
+  },
 ];
 
 /** Build a CSS linear-gradient string from stops, for previews. */

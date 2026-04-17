@@ -1,11 +1,10 @@
+@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Tiny5&display=swap");
+
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
-
-/* Minecraft-style pixel font */
-@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap");
 
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
@@ -15,6 +14,7 @@
 
   --font-pixel: "Press Start 2P", monospace;
   --font-mono-pixel: "VT323", monospace;
+  --font-tiny: "Tiny5", monospace;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
