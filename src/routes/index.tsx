@@ -32,6 +32,7 @@ const DEFAULT_CONFIG: BadgeConfig = {
   shadowEnabled: true,
   shadowColor: "#660000",
   shadowAlpha: 1,
+  cornerRadius: 2,
 };
 
 function Index() {
