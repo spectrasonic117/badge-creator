@@ -72,16 +72,36 @@ export function measureText(text: string): { width: number; height: number } {
   return { width: w, height: GLYPH_HEIGHT };
 }
 
+export type GradientStop = {
+  /** hex color #rrggbb */
+  color: string;
+  /** position 0..1 */
+  pos: number;
+};
+
 export type BadgeConfig = {
   text: string;
   padding: { l: number; r: number; t: number; b: number };
   gradientDirection: "horizontal" | "vertical";
-  bgStart: string;
-  bgEnd: string;
+  /** Ordered list of gradient color stops (min 2). */
+  gradientStops: GradientStop[];
   textColor: string;
   shadowEnabled: boolean;
+  /** Shadow color in #rrggbb (alpha applied separately). */
   shadowColor: string;
+  /** 0..1 alpha for the shadow color. */
+  shadowAlpha: number;
 };
+
+/** Convert #rrggbb + alpha (0..1) into rgba() string for canvas fill. */
+export function hexWithAlphaToRgba(hex: string, alpha: number): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  const a = Math.max(0, Math.min(1, alpha));
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
 
 /**
  * Render a badge onto a canvas at logical pixel size (1 cell = 1 px).
