@@ -72,16 +72,36 @@ export function measureText(text: string): { width: number; height: number } {
   return { width: w, height: GLYPH_HEIGHT };
 }
 
+export type GradientStop = {
+  /** hex color #rrggbb */
+  color: string;
+  /** position 0..1 */
+  pos: number;
+};
+
 export type BadgeConfig = {
   text: string;
   padding: { l: number; r: number; t: number; b: number };
   gradientDirection: "horizontal" | "vertical";
-  bgStart: string;
-  bgEnd: string;
+  /** Ordered list of gradient color stops (min 2). */
+  gradientStops: GradientStop[];
   textColor: string;
   shadowEnabled: boolean;
+  /** Shadow color in #rrggbb (alpha applied separately). */
   shadowColor: string;
+  /** 0..1 alpha for the shadow color. */
+  shadowAlpha: number;
 };
+
+/** Convert #rrggbb + alpha (0..1) into rgba() string for canvas fill. */
+export function hexWithAlphaToRgba(hex: string, alpha: number): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  const a = Math.max(0, Math.min(1, alpha));
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
 
 /**
  * Render a badge onto a canvas at logical pixel size (1 cell = 1 px).
@@ -91,7 +111,7 @@ export function renderBadge(
   canvas: HTMLCanvasElement,
   cfg: BadgeConfig,
 ): { width: number; height: number } {
-  const { text, padding, gradientDirection, bgStart, bgEnd, textColor, shadowEnabled, shadowColor } = cfg;
+  const { text, padding, gradientDirection, gradientStops, textColor, shadowEnabled, shadowColor, shadowAlpha } = cfg;
   const m = measureText(text);
   const width = padding.l + m.width + padding.r;
   const height = padding.t + m.height + padding.b;
@@ -103,25 +123,28 @@ export function renderBadge(
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, width, height);
 
-  // Background gradient
+  // Background gradient (supports N stops)
   const grad =
     gradientDirection === "horizontal"
       ? ctx.createLinearGradient(0, 0, 0, height)
       : ctx.createLinearGradient(0, 0, width, 0);
-  grad.addColorStop(0, bgStart);
-  grad.addColorStop(1, bgEnd);
+  const stops = [...gradientStops].sort((a, b) => a.pos - b.pos);
+  for (const s of stops) {
+    grad.addColorStop(Math.max(0, Math.min(1, s.pos)), s.color);
+  }
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, width, height);
 
   // Draw text glyphs
   let cx = padding.l;
   const cy = padding.t;
+  const shadowFill = hexWithAlphaToRgba(shadowColor, shadowAlpha);
   for (let i = 0; i < text.length; i++) {
     const g = getGlyph(text[i]);
     const gw = g[0].length;
     // Shadow first (1px down-right) so text overlays cleanly
     if (shadowEnabled) {
-      ctx.fillStyle = shadowColor;
+      ctx.fillStyle = shadowFill;
       for (let y = 0; y < g.length; y++) {
         for (let x = 0; x < gw; x++) {
           if (g[y][x] === "1") {
@@ -173,18 +196,31 @@ export function hexToOklch(hex: string): { l: number; c: number; h: number } {
   return { l: L, c: C, h: H };
 }
 
-export const GRADIENT_PRESETS: { name: string; start: string; end: string }[] = [
-  { name: "Red", start: "#FF3333", end: "#CC0000" },
-  { name: "Orange", start: "#FFA64D", end: "#E66B00" },
-  { name: "Yellow", start: "#FFE94D", end: "#E6B800" },
-  { name: "Green", start: "#5CE65C", end: "#1F9E1F" },
-  { name: "Cyan", start: "#5CE6E6", end: "#0E8C8C" },
-  { name: "Blue", start: "#4DA6FF", end: "#1257B5" },
-  { name: "Purple", start: "#B266FF", end: "#6A1FB5" },
-  { name: "Pink", start: "#FF66CC", end: "#CC1F8E" },
-  { name: "White", start: "#FFFFFF", end: "#BFBFBF" },
-  { name: "Black", start: "#4D4D4D", end: "#0A0A0A" },
-  { name: "Teal", start: "#33D9B2", end: "#0E8068" },
-  { name: "Magenta", start: "#FF4DBF", end: "#A31273" },
-  { name: "Gold", start: "#FFD24D", end: "#B8860B" },
+export const GRADIENT_PRESETS: { name: string; stops: GradientStop[] }[] = [
+  { name: "Red", stops: [{ color: "#FF3333", pos: 0 }, { color: "#CC0000", pos: 1 }] },
+  { name: "Orange", stops: [{ color: "#FFA64D", pos: 0 }, { color: "#E66B00", pos: 1 }] },
+  { name: "Yellow", stops: [{ color: "#FFE94D", pos: 0 }, { color: "#E6B800", pos: 1 }] },
+  { name: "Green", stops: [{ color: "#5CE65C", pos: 0 }, { color: "#1F9E1F", pos: 1 }] },
+  { name: "Cyan", stops: [{ color: "#5CE6E6", pos: 0 }, { color: "#0E8C8C", pos: 1 }] },
+  { name: "Blue", stops: [{ color: "#4DA6FF", pos: 0 }, { color: "#1257B5", pos: 1 }] },
+  { name: "Purple", stops: [{ color: "#B266FF", pos: 0 }, { color: "#6A1FB5", pos: 1 }] },
+  { name: "Pink", stops: [{ color: "#FF66CC", pos: 0 }, { color: "#CC1F8E", pos: 1 }] },
+  { name: "White", stops: [{ color: "#FFFFFF", pos: 0 }, { color: "#BFBFBF", pos: 1 }] },
+  { name: "Black", stops: [{ color: "#4D4D4D", pos: 0 }, { color: "#0A0A0A", pos: 1 }] },
+  { name: "Teal", stops: [{ color: "#33D9B2", pos: 0 }, { color: "#0E8068", pos: 1 }] },
+  { name: "Magenta", stops: [{ color: "#FF4DBF", pos: 0 }, { color: "#A31273", pos: 1 }] },
+  { name: "Gold", stops: [{ color: "#FFD24D", pos: 0 }, { color: "#B8860B", pos: 1 }] },
+  { name: "Rainbow", stops: [
+    { color: "#FF3333", pos: 0 },
+    { color: "#FFD24D", pos: 0.33 },
+    { color: "#33D9B2", pos: 0.66 },
+    { color: "#B266FF", pos: 1 },
+  ] },
 ];
+
+/** Build a CSS linear-gradient string from stops, for previews. */
+export function stopsToCss(stops: GradientStop[], angleDeg: number): string {
+  const sorted = [...stops].sort((a, b) => a.pos - b.pos);
+  const parts = sorted.map((s) => `${s.color} ${(s.pos * 100).toFixed(1)}%`);
+  return `linear-gradient(${angleDeg}deg, ${parts.join(", ")})`;
+}
