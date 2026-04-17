@@ -196,18 +196,31 @@ export function hexToOklch(hex: string): { l: number; c: number; h: number } {
   return { l: L, c: C, h: H };
 }
 
-export const GRADIENT_PRESETS: { name: string; start: string; end: string }[] = [
-  { name: "Red", start: "#FF3333", end: "#CC0000" },
-  { name: "Orange", start: "#FFA64D", end: "#E66B00" },
-  { name: "Yellow", start: "#FFE94D", end: "#E6B800" },
-  { name: "Green", start: "#5CE65C", end: "#1F9E1F" },
-  { name: "Cyan", start: "#5CE6E6", end: "#0E8C8C" },
-  { name: "Blue", start: "#4DA6FF", end: "#1257B5" },
-  { name: "Purple", start: "#B266FF", end: "#6A1FB5" },
-  { name: "Pink", start: "#FF66CC", end: "#CC1F8E" },
-  { name: "White", start: "#FFFFFF", end: "#BFBFBF" },
-  { name: "Black", start: "#4D4D4D", end: "#0A0A0A" },
-  { name: "Teal", start: "#33D9B2", end: "#0E8068" },
-  { name: "Magenta", start: "#FF4DBF", end: "#A31273" },
-  { name: "Gold", start: "#FFD24D", end: "#B8860B" },
+export const GRADIENT_PRESETS: { name: string; stops: GradientStop[] }[] = [
+  { name: "Red", stops: [{ color: "#FF3333", pos: 0 }, { color: "#CC0000", pos: 1 }] },
+  { name: "Orange", stops: [{ color: "#FFA64D", pos: 0 }, { color: "#E66B00", pos: 1 }] },
+  { name: "Yellow", stops: [{ color: "#FFE94D", pos: 0 }, { color: "#E6B800", pos: 1 }] },
+  { name: "Green", stops: [{ color: "#5CE65C", pos: 0 }, { color: "#1F9E1F", pos: 1 }] },
+  { name: "Cyan", stops: [{ color: "#5CE6E6", pos: 0 }, { color: "#0E8C8C", pos: 1 }] },
+  { name: "Blue", stops: [{ color: "#4DA6FF", pos: 0 }, { color: "#1257B5", pos: 1 }] },
+  { name: "Purple", stops: [{ color: "#B266FF", pos: 0 }, { color: "#6A1FB5", pos: 1 }] },
+  { name: "Pink", stops: [{ color: "#FF66CC", pos: 0 }, { color: "#CC1F8E", pos: 1 }] },
+  { name: "White", stops: [{ color: "#FFFFFF", pos: 0 }, { color: "#BFBFBF", pos: 1 }] },
+  { name: "Black", stops: [{ color: "#4D4D4D", pos: 0 }, { color: "#0A0A0A", pos: 1 }] },
+  { name: "Teal", stops: [{ color: "#33D9B2", pos: 0 }, { color: "#0E8068", pos: 1 }] },
+  { name: "Magenta", stops: [{ color: "#FF4DBF", pos: 0 }, { color: "#A31273", pos: 1 }] },
+  { name: "Gold", stops: [{ color: "#FFD24D", pos: 0 }, { color: "#B8860B", pos: 1 }] },
+  { name: "Rainbow", stops: [
+    { color: "#FF3333", pos: 0 },
+    { color: "#FFD24D", pos: 0.33 },
+    { color: "#33D9B2", pos: 0.66 },
+    { color: "#B266FF", pos: 1 },
+  ] },
 ];
+
+/** Build a CSS linear-gradient string from stops, for previews. */
+export function stopsToCss(stops: GradientStop[], angleDeg: number): string {
+  const sorted = [...stops].sort((a, b) => a.pos - b.pos);
+  const parts = sorted.map((s) => `${s.color} ${(s.pos * 100).toFixed(1)}%`);
+  return `linear-gradient(${angleDeg}deg, ${parts.join(", ")})`;
+}
