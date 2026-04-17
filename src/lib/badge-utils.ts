@@ -24,10 +24,7 @@ export type BadgeConfig = {
 /**
  * Measure text using Tiny5 font at given size.
  */
-export function measureText(
-  text: string,
-  fontSize: number = 8,
-): { width: number; height: number } {
+export function measureText(text: string, fontSize: number = 8): { width: number; height: number } {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d")!;
   ctx.font = `${fontSize}px Tiny5`;
@@ -82,14 +79,15 @@ export function renderBadge(
   } = cfg;
   const fontSize = 8;
   const m = measureText(text, fontSize);
-  const width = padding.l + m.width + padding.r;
-  const height = padding.t + m.height + padding.b;
+  const width = Math.floor(padding.l) + m.width + Math.floor(padding.r);
+  const height = Math.floor(padding.t) + m.height + Math.floor(padding.b);
 
   canvas.width = width;
   canvas.height = height;
 
-  const ctx = canvas.getContext("2d")!;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
   ctx.imageSmoothingEnabled = false;
+  ctx.imageSmoothingQuality = "low";
   ctx.clearRect(0, 0, width, height);
 
   // Background gradient (supports N stops)
@@ -104,11 +102,11 @@ export function renderBadge(
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, width, height);
 
-  // Draw text using Tiny5 font
-  const textX = padding.l;
-  const textY = padding.t + fontSize - 2;
+  // Draw text using Tiny5 font - use integer coordinates for pixel perfection
+  const textX = Math.floor(padding.l);
+  const textY = Math.floor(padding.t + fontSize - 2);
 
-  // Shadow
+  // Shadow (offset by 1 pixel)
   if (shadowEnabled) {
     ctx.font = `${fontSize}px Tiny5`;
     ctx.fillStyle = hexWithAlphaToRgba(shadowColor, shadowAlpha);

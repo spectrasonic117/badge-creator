@@ -43,6 +43,8 @@ export function BadgeCanvas({ config, onSize }: Props) {
               width: size.w * scale,
               height: size.h * scale,
               imageRendering: "pixelated",
+              fontSmooth: "never",
+              WebkitFontSmoothing: "none",
             }}
           />
         </div>

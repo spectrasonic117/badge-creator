@@ -30,8 +30,8 @@ const DEFAULT_CONFIG: BadgeConfig = {
   ],
   textColor: "#FFFFFF",
   shadowEnabled: true,
-  shadowColor: "#660000",
-  shadowAlpha: 1,
+  shadowColor: "#000000",
+  shadowAlpha: 0.4,
   cornerRadius: 2,
 };
 
@@ -77,8 +77,7 @@ function Index() {
           aria-label="Download badge"
           className="group absolute right-6 top-6 grid h-14 w-14 place-items-center rounded-full bg-accent text-accent-foreground shadow-lg ring-2 ring-accent/40 transition-all hover:scale-110 hover:shadow-2xl"
           style={{
-            boxShadow:
-              "0 10px 30px -10px color-mix(in oklab, var(--accent) 60%, transparent)",
+            boxShadow: "0 10px 30px -10px color-mix(in oklab, var(--accent) 60%, transparent)",
           }}
         >
           <Download className="h-6 w-6 transition-transform group-hover:translate-y-0.5" />

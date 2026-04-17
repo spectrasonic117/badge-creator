@@ -87,12 +87,7 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family:
-      ui-sans-serif,
-      system-ui,
-      -apple-system,
-      "Segoe UI",
-      sans-serif;
-    -webkit-font-smoothing: antialiased;
+      Tiny5
   }
 
   /* Pixel-crisp rendering helpers */
