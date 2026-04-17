@@ -91,7 +91,22 @@ export type BadgeConfig = {
   shadowColor: string;
   /** 0..1 alpha for the shadow color. */
   shadowAlpha: number;
+  /** Pixel-art corner radius (in logical px). 0 = square. */
+  cornerRadius: number;
 };
+
+/**
+ * Pixel-art quarter-circle mask: for a corner of size r,
+ * returns true if pixel (x,y) within the r×r box should be CUT (transparent).
+ * Uses circle equation so the corner reads as a chunky pixel arc.
+ */
+function isCornerCut(x: number, y: number, r: number): boolean {
+  if (r <= 0) return false;
+  // Distance from the inner-corner pivot to the pixel center.
+  const dx = r - 0.5 - x;
+  const dy = r - 0.5 - y;
+  return dx * dx + dy * dy > (r - 0.5) * (r - 0.5);
+}
 
 /** Convert #rrggbb + alpha (0..1) into rgba() string for canvas fill. */
 export function hexWithAlphaToRgba(hex: string, alpha: number): string {
@@ -111,7 +126,7 @@ export function renderBadge(
   canvas: HTMLCanvasElement,
   cfg: BadgeConfig,
 ): { width: number; height: number } {
-  const { text, padding, gradientDirection, gradientStops, textColor, shadowEnabled, shadowColor, shadowAlpha } = cfg;
+  const { text, padding, gradientDirection, gradientStops, textColor, shadowEnabled, shadowColor, shadowAlpha, cornerRadius } = cfg;
   const m = measureText(text);
   const width = padding.l + m.width + padding.r;
   const height = padding.t + m.height + padding.b;
@@ -162,6 +177,21 @@ export function renderBadge(
       }
     }
     cx += gw + GLYPH_GAP;
+  }
+
+  // Pixel-art rounded corners — clear pixels in the four corners.
+  const r = Math.max(0, Math.min(Math.floor(Math.min(width, height) / 2), Math.floor(cornerRadius)));
+  if (r > 0) {
+    for (let y = 0; y < r; y++) {
+      for (let x = 0; x < r; x++) {
+        if (isCornerCut(x, y, r)) {
+          ctx.clearRect(x, y, 1, 1);                            // top-left
+          ctx.clearRect(width - 1 - x, y, 1, 1);                // top-right
+          ctx.clearRect(x, height - 1 - y, 1, 1);               // bottom-left
+          ctx.clearRect(width - 1 - x, height - 1 - y, 1, 1);   // bottom-right
+        }
+      }
+    }
   }
 
   return { width, height };

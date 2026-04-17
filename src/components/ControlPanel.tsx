@@ -141,6 +141,30 @@ export function ControlPanel({ config, setConfig }: Props) {
         <PaddingRow label="B" value={config.padding.b} onChange={(v) => updatePadding("b", v)} />
       </div>
 
+      {/* Corner radius (pixel-art) */}
+      <div>
+        <div className="flex items-center justify-between">
+          <SectionLabel>Corner Radius</SectionLabel>
+          <span
+            className="mb-3 text-xs text-foreground"
+            style={{ fontFamily: "var(--font-mono-pixel)", fontSize: "14px" }}
+          >
+            {config.cornerRadius}px
+          </span>
+        </div>
+        <Slider
+          value={[config.cornerRadius]}
+          min={0}
+          max={12}
+          step={1}
+          onValueChange={(v) => update("cornerRadius", v[0])}
+        />
+        <div className="mt-2 flex justify-between text-[10px] uppercase tracking-widest text-muted-foreground">
+          <span>Square</span>
+          <span>Round</span>
+        </div>
+      </div>
+
       {/* Gradient direction */}
       <div>
         <SectionLabel>Gradient Direction</SectionLabel>
