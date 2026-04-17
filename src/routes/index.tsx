@@ -24,19 +24,23 @@ const DEFAULT_CONFIG: BadgeConfig = {
   text: "ADMIN",
   padding: { l: 4, r: 4, t: 2, b: 2 },
   gradientDirection: "horizontal",
-  bgStart: "#FF3333",
-  bgEnd: "#CC0000",
+  gradientStops: [
+    { color: "#FF3333", pos: 0 },
+    { color: "#CC0000", pos: 1 },
+  ],
   textColor: "#FFFFFF",
   shadowEnabled: true,
   shadowColor: "#660000",
+  shadowAlpha: 1,
 };
 
 function Index() {
   const [config, setConfig] = useState<BadgeConfig>(DEFAULT_CONFIG);
 
-  // Drive accent color dynamically from the badge's start gradient color.
+  // Drive accent color dynamically from the badge's first gradient stop.
   useEffect(() => {
-    const { l, c, h } = hexToOklch(config.bgStart);
+    const primary = config.gradientStops[0]?.color ?? "#FF3333";
+    const { l, c, h } = hexToOklch(primary);
     const root = document.documentElement;
     // Boost lightness/chroma slightly so accent reads on dark UI
     const accentL = Math.min(0.78, Math.max(0.55, l + 0.05));
@@ -44,20 +48,13 @@ function Index() {
     root.style.setProperty("--accent-l", accentL.toString());
     root.style.setProperty("--accent-s", accentC.toString());
     root.style.setProperty("--accent-h", h.toString());
-  }, [config.bgStart]);
+  }, [config.gradientStops]);
 
   const handleDownload = () => {
+    // Export at native (1×) pixel size — these are tiny pixel-art badges.
     const off = document.createElement("canvas");
     renderBadge(off, config);
-    // Upscale 12x for a chunky export
-    const SCALE = 12;
-    const scaled = document.createElement("canvas");
-    scaled.width = off.width * SCALE;
-    scaled.height = off.height * SCALE;
-    const sctx = scaled.getContext("2d")!;
-    sctx.imageSmoothingEnabled = false;
-    sctx.drawImage(off, 0, 0, scaled.width, scaled.height);
-    const url = scaled.toDataURL("image/png");
+    const url = off.toDataURL("image/png");
     const a = document.createElement("a");
     a.href = url;
     a.download = `${config.text.toLowerCase() || "badge"}.png`;
