@@ -69,6 +69,81 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 
 /**
+ * Draw pixel-perfect text (no anti-aliasing) by rendering to a temp canvas,
+ * thresholding alpha to 0 or 255, then snapping opaque pixels to allowed colors.
+ */
+function drawPixelPerfectText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  textX: number,
+  textY: number,
+  fontSize: number,
+  textColor: string,
+  shadowEnabled: boolean,
+  shadowColor: string,
+  shadowAlpha: number,
+  allowedColors: Array<[number, number, number]>,
+) {
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+
+  // Render text + shadow onto a temp canvas
+  const temp = document.createElement("canvas");
+  temp.width = w;
+  temp.height = h;
+  const tctx = temp.getContext("2d", { willReadFrequently: true })!;
+  tctx.font = `${fontSize}px Tiny5`;
+
+  if (shadowEnabled) {
+    tctx.fillStyle = shadowColor;
+    tctx.globalAlpha = shadowAlpha;
+    tctx.fillText(text, textX, textY + 1);
+    tctx.globalAlpha = 1;
+  }
+
+  tctx.fillStyle = textColor;
+  tctx.fillText(text, textX, textY);
+
+  // Threshold alpha and snap colors — eliminate all anti-aliasing
+  const imageData = tctx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3];
+    if (a < 128) {
+      // Fully transparent
+      data[i + 3] = 0;
+    } else {
+      data[i + 3] = 255;
+      // Snap RGB to nearest allowed color
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      let bestDist = Infinity;
+      let bestColor = allowedColors[0];
+      for (const [cr, cg, cb] of allowedColors) {
+        const dr = r - cr;
+        const dg = g - cg;
+        const db = b - cb;
+        const dist = dr * dr + dg * dg + db * db;
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestColor = [cr, cg, cb];
+        }
+      }
+      data[i] = bestColor[0];
+      data[i + 1] = bestColor[1];
+      data[i + 2] = bestColor[2];
+    }
+  }
+
+  tctx.putImageData(imageData, 0, 0);
+
+  // Composite onto main canvas
+  ctx.drawImage(temp, 0, 0);
+}
+
+/**
  * Render a badge onto a canvas at logical pixel size (1 cell = 1 px).
  * Caller scales the canvas via CSS for crisp preview.
  */
@@ -122,26 +197,15 @@ export function renderBadge(
     allowedColors.push(hexToRgb(shadowColor));
   }
 
-  // Snapshot background before drawing text so we can detect changed pixels
-  const bgImageData = ctx.getImageData(0, 0, width, height);
-
-  // Draw text using Tiny5 font - use integer coordinates for pixel perfection
+  // Draw pixel-perfect text via temp canvas + alpha threshold + color snap
   const textX = Math.floor(padding.l);
   const textY = Math.floor(padding.t + fontSize - 2);
 
-  // Shadow (offset by 1 pixel)
-  if (shadowEnabled) {
-    ctx.font = `${fontSize}px Tiny5`;
-    ctx.fillStyle = shadowColor;
-    ctx.globalAlpha = shadowAlpha;
-    ctx.fillText(text, textX, textY + 1);
-    ctx.globalAlpha = 1;
-  }
-
-  // Main text
-  ctx.font = `${fontSize}px Tiny5`;
-  ctx.fillStyle = textColor;
-  ctx.fillText(text, textX, textY);
+  drawPixelPerfectText(
+    ctx, text, textX, textY, fontSize,
+    textColor, shadowEnabled, shadowColor, shadowAlpha,
+    allowedColors,
+  );
 
   // Pixel-art rounded corners — clear pixels in the four corners.
   const r = Math.max(
