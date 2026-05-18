@@ -8,16 +8,6 @@ import { hexToOklch, renderBadge } from "@/lib/badge-utils";
 
 export const Route = createFileRoute("/")({
   component: Index,
-  head: () => ({
-    meta: [
-      { title: "Badge Forge — Minecraft Rank Badge Generator" },
-      {
-        name: "description",
-        content:
-          "Design pixel-perfect Minecraft-style rank badges. Customize text, gradients, padding, shadow and export PNGs instantly.",
-      },
-    ],
-  }),
 });
 
 const DEFAULT_CONFIG: BadgeConfig = {
