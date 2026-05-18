@@ -1,4 +1,12 @@
-@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Tiny5&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Tiny5&display=swap");
+
+@font-face {
+  font-family: "Tiny5";
+  src: url("/fonts/tiny5/tiny5.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
+}
 
 @import "tailwindcss" source(none);
 @source "../src";
@@ -13,7 +21,7 @@
   --radius-xl: calc(var(--radius) + 4px);
 
   --font-pixel: "Press Start 2P", monospace;
-  --font-mono-pixel: "VT323", monospace;
+  --font-mono-pixel: "Press Start 2P", monospace;
   --font-tiny: "Tiny5", monospace;
 
   --color-background: var(--background);
@@ -87,7 +95,7 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family:
-      Tiny5
+      "Tiny5", monospace;
   }
 
   /* Pixel-crisp rendering helpers */

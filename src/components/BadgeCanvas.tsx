@@ -10,13 +10,22 @@ type Props = {
 export function BadgeCanvas({ config, onSize }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    let cancelled = false;
+    document.fonts.ready.then(() => {
+      if (!cancelled) setReady(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !canvasRef.current) return;
     const { width, height } = renderBadge(canvasRef.current, config);
     setSize({ w: width, h: height });
     onSize?.(width, height);
-  }, [config, onSize]);
+  }, [ready, config, onSize]);
 
   // Auto scale: aim for ~12x preview, clamp so it fits in viewport
   const scale = Math.max(4, Math.min(16, Math.floor(720 / Math.max(size.w, 1))));

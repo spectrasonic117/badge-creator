@@ -58,6 +58,16 @@ export function hexWithAlphaToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
+/** Parse hex color to [r,g,b] tuple. */
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [
+    parseInt(h.substring(0, 2), 16),
+    parseInt(h.substring(2, 4), 16),
+    parseInt(h.substring(4, 6), 16),
+  ];
+}
+
 /**
  * Render a badge onto a canvas at logical pixel size (1 cell = 1 px).
  * Caller scales the canvas via CSS for crisp preview.
@@ -102,6 +112,19 @@ export function renderBadge(
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, width, height);
 
+  // Collect all expected solid colors for quantization
+  const allowedColors: Array<[number, number, number]> = [];
+  for (const stop of gradientStops) {
+    allowedColors.push(hexToRgb(stop.color));
+  }
+  allowedColors.push(hexToRgb(textColor));
+  if (shadowEnabled) {
+    allowedColors.push(hexToRgb(shadowColor));
+  }
+
+  // Snapshot background before drawing text so we can detect changed pixels
+  const bgImageData = ctx.getImageData(0, 0, width, height);
+
   // Draw text using Tiny5 font - use integer coordinates for pixel perfection
   const textX = Math.floor(padding.l);
   const textY = Math.floor(padding.t + fontSize - 2);
@@ -109,8 +132,10 @@ export function renderBadge(
   // Shadow (offset by 1 pixel)
   if (shadowEnabled) {
     ctx.font = `${fontSize}px Tiny5`;
-    ctx.fillStyle = hexWithAlphaToRgba(shadowColor, shadowAlpha);
+    ctx.fillStyle = shadowColor;
+    ctx.globalAlpha = shadowAlpha;
     ctx.fillText(text, textX, textY + 1);
+    ctx.globalAlpha = 1;
   }
 
   // Main text
