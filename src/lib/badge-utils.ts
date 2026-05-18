@@ -58,6 +58,94 @@ export function hexWithAlphaToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${a})`;
 }
 
+/** Parse hex color to [r,g,b] tuple. */
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [
+    parseInt(h.substring(0, 2), 16),
+    parseInt(h.substring(2, 4), 16),
+    parseInt(h.substring(4, 6), 16),
+  ];
+}
+
+/**
+ * Draw pixel-perfect text (no anti-aliasing) by rendering to a temp canvas,
+ * thresholding alpha to 0 or 255, then snapping opaque pixels to allowed colors.
+ * Shadow and main text are processed separately so shadow opacity is preserved.
+ */
+function drawPixelPerfectText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  textX: number,
+  textY: number,
+  fontSize: number,
+  textColor: string,
+  shadowEnabled: boolean,
+  shadowColor: string,
+  shadowAlpha: number,
+  allowedColors: Array<[number, number, number]>,
+) {
+  const w = ctx.canvas.width;
+  const h = ctx.canvas.height;
+
+  // Helper: render text to a temp canvas, threshold alpha, snap colors
+  function renderLayer(
+    color: string,
+    yOffset: number,
+    alphaScale: number,
+  ) {
+    const temp = document.createElement("canvas");
+    temp.width = w;
+    temp.height = h;
+    const tctx = temp.getContext("2d", { willReadFrequently: true })!;
+    tctx.font = `${fontSize}px Tiny5`;
+    tctx.fillStyle = color;
+    tctx.fillText(text, textX, textY + yOffset);
+
+    const imageData = tctx.getImageData(0, 0, w, h);
+    const data = imageData.data;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3];
+      if (a < 128) {
+        data[i + 3] = 0;
+      } else {
+        // Snap RGB to nearest allowed color
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        let bestDist = Infinity;
+        let bestColor = allowedColors[0];
+        for (const [cr, cg, cb] of allowedColors) {
+          const dr = r - cr;
+          const dg = g - cg;
+          const db = b - cb;
+          const dist = dr * dr + dg * dg + db * db;
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestColor = [cr, cg, cb];
+          }
+        }
+        data[i] = bestColor[0];
+        data[i + 1] = bestColor[1];
+        data[i + 2] = bestColor[2];
+        data[i + 3] = Math.round(255 * alphaScale);
+      }
+    }
+
+    tctx.putImageData(imageData, 0, 0);
+    ctx.drawImage(temp, 0, 0);
+  }
+
+  // Shadow layer (offset by 1px, reduced opacity)
+  if (shadowEnabled) {
+    renderLayer(shadowColor, 1, shadowAlpha);
+  }
+
+  // Main text layer (full opacity)
+  renderLayer(textColor, 0, 1);
+}
+
 /**
  * Render a badge onto a canvas at logical pixel size (1 cell = 1 px).
  * Caller scales the canvas via CSS for crisp preview.
@@ -102,21 +190,25 @@ export function renderBadge(
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, width, height);
 
-  // Draw text using Tiny5 font - use integer coordinates for pixel perfection
+  // Collect all expected solid colors for quantization
+  const allowedColors: Array<[number, number, number]> = [];
+  for (const stop of gradientStops) {
+    allowedColors.push(hexToRgb(stop.color));
+  }
+  allowedColors.push(hexToRgb(textColor));
+  if (shadowEnabled) {
+    allowedColors.push(hexToRgb(shadowColor));
+  }
+
+  // Draw pixel-perfect text via temp canvas + alpha threshold + color snap
   const textX = Math.floor(padding.l);
   const textY = Math.floor(padding.t + fontSize - 2);
 
-  // Shadow (offset by 1 pixel)
-  if (shadowEnabled) {
-    ctx.font = `${fontSize}px Tiny5`;
-    ctx.fillStyle = hexWithAlphaToRgba(shadowColor, shadowAlpha);
-    ctx.fillText(text, textX, textY + 1);
-  }
-
-  // Main text
-  ctx.font = `${fontSize}px Tiny5`;
-  ctx.fillStyle = textColor;
-  ctx.fillText(text, textX, textY);
+  drawPixelPerfectText(
+    ctx, text, textX, textY, fontSize,
+    textColor, shadowEnabled, shadowColor, shadowAlpha,
+    allowedColors,
+  );
 
   // Pixel-art rounded corners — clear pixels in the four corners.
   const r = Math.max(
