@@ -108,7 +108,6 @@ function drawPixelPerfectText(
   shadowEnabled: boolean,
   shadowColor: string,
   shadowAlpha: number,
-  allowedColors: Array<[number, number, number]>,
 ) {
   const w = ctx.canvas.width;
   const h = ctx.canvas.height;
@@ -118,6 +117,7 @@ function drawPixelPerfectText(
     color: string,
     yOffset: number,
     alphaScale: number,
+    targetColor: [number, number, number],
   ) {
     const temp = document.createElement("canvas");
     temp.width = w;
@@ -125,7 +125,15 @@ function drawPixelPerfectText(
     const tctx = temp.getContext("2d", { willReadFrequently: true })!;
     tctx.font = `${fontSize}px Tiny5`;
     tctx.fillStyle = color;
-    tctx.fillText(text, textX, textY + yOffset);
+    // Render each character individually at integer x positions to prevent
+    // subpixel overlap between adjacent glyphs (which causes fused/gapped pixels
+    // after alpha thresholding).
+    let charX = textX;
+    for (const ch of text) {
+      const snappedX = Math.round(charX);
+      tctx.fillText(ch, snappedX, textY + yOffset);
+      charX += Math.ceil(tctx.measureText(ch).width);
+    }
 
     const imageData = tctx.getImageData(0, 0, w, h);
     const data = imageData.data;
@@ -135,25 +143,12 @@ function drawPixelPerfectText(
       if (a < 128) {
         data[i + 3] = 0;
       } else {
-        // Snap RGB to nearest allowed color
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        let bestDist = Infinity;
-        let bestColor = allowedColors[0];
-        for (const [cr, cg, cb] of allowedColors) {
-          const dr = r - cr;
-          const dg = g - cg;
-          const db = b - cb;
-          const dist = dr * dr + dg * dg + db * db;
-          if (dist < bestDist) {
-            bestDist = dist;
-            bestColor = [cr, cg, cb];
-          }
-        }
-        data[i] = bestColor[0];
-        data[i + 1] = bestColor[1];
-        data[i + 2] = bestColor[2];
+        // Snap directly to the target color (text or shadow), never to
+        // gradient colors — prevents edge pixels from being colored as
+        // the background gradient when they're closer to it.
+        data[i] = targetColor[0];
+        data[i + 1] = targetColor[1];
+        data[i + 2] = targetColor[2];
         data[i + 3] = Math.round(255 * alphaScale);
       }
     }
@@ -164,11 +159,11 @@ function drawPixelPerfectText(
 
   // Shadow layer (offset by 1px, reduced opacity)
   if (shadowEnabled) {
-    renderLayer(shadowColor, 1, shadowAlpha);
+    renderLayer(shadowColor, 1, shadowAlpha, hexToRgb(shadowColor));
   }
 
   // Main text layer (full opacity)
-  renderLayer(textColor, 0, 1);
+  renderLayer(textColor, 0, 1, hexToRgb(textColor));
 }
 
 /**
@@ -221,16 +216,6 @@ export function renderBadge(
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, width, height);
 
-  // Collect all expected solid colors for quantization
-  const allowedColors: Array<[number, number, number]> = [];
-  for (const stop of gradientStops) {
-    allowedColors.push(hexToRgb(stop.color));
-  }
-  allowedColors.push(hexToRgb(textColor));
-  if (shadowEnabled) {
-    allowedColors.push(hexToRgb(shadowColor));
-  }
-
   // Draw pixel-perfect text via temp canvas + alpha threshold + color snap
   const textX = Math.floor(padding.l);
   const textY = Math.floor(padding.t + fontSize - 2);
@@ -238,7 +223,6 @@ export function renderBadge(
   drawPixelPerfectText(
     ctx, text, textX, textY, fontSize,
     textColor, shadowEnabled, shadowColor, shadowAlpha,
-    allowedColors,
   );
 
   // Pixel-art rounded corners — clear pixels in the four corners.
