@@ -21,6 +21,14 @@ export type BadgeConfig = {
   cornerRadius: number;
 };
 
+const LETTER_GAP = 1;
+const TEXT_ALPHA_THRESHOLD = 200;
+const SHADOW_ALPHA_THRESHOLD = 128;
+
+function getCharAdvance(ctx: CanvasRenderingContext2D, ch: string): number {
+  return Math.ceil(ctx.measureText(ch).width);
+}
+
 /**
  * Compute badge dimensions from config WITHOUT drawing.
  * Uses the same measurement logic but doesn't touch any canvas.
@@ -41,16 +49,22 @@ export function computeDimensions(cfg: BadgeConfig, fontSize: number = 8): { wid
 export function measureText(text: string, fontSize: number = 8): { width: number; height: number } {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d")!;
+  const chars = [...text];
   ctx.font = `${fontSize}px Tiny5`;
-  const metrics = ctx.measureText(text);
-  const width = Math.ceil(metrics.width);
+  const width = chars.reduce((total, ch, idx) => {
+    const gap = idx < chars.length - 1 ? LETTER_GAP : 0;
+    return total + getCharAdvance(ctx, ch) + gap;
+  }, 0);
   // Guard: if the font wasn't loaded, metrics may report 0 width for non-empty text
   if (width === 0 && text.length > 0) {
     // Fallback: monospace measurement (each char ≈ 0.6em in typical pixel fonts)
     ctx.font = `${fontSize}px monospace`;
-    const fallback = ctx.measureText(text);
+    const fallbackWidth = chars.reduce((total, ch, idx) => {
+      const gap = idx < chars.length - 1 ? LETTER_GAP : 0;
+      return total + getCharAdvance(ctx, ch) + gap;
+    }, 0);
     return {
-      width: Math.ceil(fallback.width),
+      width: fallbackWidth,
       height: fontSize,
     };
   }
@@ -118,6 +132,7 @@ function drawPixelPerfectText(
     yOffset: number,
     alphaScale: number,
     targetColor: [number, number, number],
+    alphaThreshold: number,
   ) {
     const temp = document.createElement("canvas");
     temp.width = w;
@@ -125,14 +140,15 @@ function drawPixelPerfectText(
     const tctx = temp.getContext("2d", { willReadFrequently: true })!;
     tctx.font = `${fontSize}px Tiny5`;
     tctx.fillStyle = color;
-    // Render each character individually at integer x positions to prevent
-    // subpixel overlap between adjacent glyphs (which causes fused/gapped pixels
-    // after alpha thresholding).
     let charX = textX;
-    for (const ch of text) {
+    const chars = [...text];
+    for (let i = 0; i < chars.length; i++) {
+      const ch = chars[i];
       const snappedX = Math.round(charX);
       tctx.fillText(ch, snappedX, textY + yOffset);
-      charX += Math.ceil(tctx.measureText(ch).width);
+      if (i < chars.length - 1) {
+        charX += getCharAdvance(tctx, ch) + LETTER_GAP;
+      }
     }
 
     const imageData = tctx.getImageData(0, 0, w, h);
@@ -140,7 +156,7 @@ function drawPixelPerfectText(
 
     for (let i = 0; i < data.length; i += 4) {
       const a = data[i + 3];
-      if (a < 128) {
+      if (a < alphaThreshold) {
         data[i + 3] = 0;
       } else {
         // Snap directly to the target color (text or shadow), never to
@@ -159,11 +175,11 @@ function drawPixelPerfectText(
 
   // Shadow layer (offset by 1px, reduced opacity)
   if (shadowEnabled) {
-    renderLayer(shadowColor, 1, shadowAlpha, hexToRgb(shadowColor));
+    renderLayer(shadowColor, 1, shadowAlpha, hexToRgb(shadowColor), SHADOW_ALPHA_THRESHOLD);
   }
 
   // Main text layer (full opacity)
-  renderLayer(textColor, 0, 1, hexToRgb(textColor));
+  renderLayer(textColor, 0, 1, hexToRgb(textColor), TEXT_ALPHA_THRESHOLD);
 }
 
 /**
