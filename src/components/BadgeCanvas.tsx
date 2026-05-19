@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { BadgeConfig } from "@/lib/badge-utils";
-import { renderBadge } from "@/lib/badge-utils";
+import { renderBadge, computeDimensions } from "@/lib/badge-utils";
 
 type Props = {
   config: BadgeConfig;
@@ -20,11 +20,13 @@ export function BadgeCanvas({ config, onSize }: Props) {
     return () => { cancelled = true; };
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!ready || !canvasRef.current) return;
-    const { width, height } = renderBadge(canvasRef.current, config);
-    setSize({ w: width, h: height });
-    onSize?.(width, height);
+    const canvas = canvasRef.current;
+    const dims = computeDimensions(config);
+    renderBadge(canvas, config, dims.width, dims.height);
+    setSize({ w: dims.width, h: dims.height });
+    onSize?.(dims.width, dims.height);
   }, [ready, config, onSize]);
 
   // Auto scale: aim for ~12x preview, clamp so it fits in viewport

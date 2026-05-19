@@ -22,15 +22,40 @@ export type BadgeConfig = {
 };
 
 /**
+ * Compute badge dimensions from config WITHOUT drawing.
+ * Uses the same measurement logic but doesn't touch any canvas.
+ */
+export function computeDimensions(cfg: BadgeConfig, fontSize: number = 8): { width: number; height: number } {
+  const m = measureText(cfg.text, fontSize);
+  return {
+    width: Math.floor(cfg.padding.l) + m.width + Math.floor(cfg.padding.r),
+    height: Math.floor(cfg.padding.t) + m.height + Math.floor(cfg.padding.b),
+  };
+}
+
+/**
  * Measure text using Tiny5 font at given size.
+ * Requires the Tiny5 font to be loaded before calling.
+ * Falls back to a monospace measurement if Tiny5 isn't available.
  */
 export function measureText(text: string, fontSize: number = 8): { width: number; height: number } {
   const canvas = document.createElement("canvas");
   const ctx = canvas.getContext("2d")!;
   ctx.font = `${fontSize}px Tiny5`;
   const metrics = ctx.measureText(text);
+  const width = Math.ceil(metrics.width);
+  // Guard: if the font wasn't loaded, metrics may report 0 width for non-empty text
+  if (width === 0 && text.length > 0) {
+    // Fallback: monospace measurement (each char ≈ 0.6em in typical pixel fonts)
+    ctx.font = `${fontSize}px monospace`;
+    const fallback = ctx.measureText(text);
+    return {
+      width: Math.ceil(fallback.width),
+      height: fontSize,
+    };
+  }
   return {
-    width: Math.ceil(metrics.width),
+    width,
     height: fontSize,
   };
 }
@@ -153,7 +178,9 @@ function drawPixelPerfectText(
 export function renderBadge(
   canvas: HTMLCanvasElement,
   cfg: BadgeConfig,
-): { width: number; height: number } {
+  width: number,
+  height: number,
+): void {
   const {
     text,
     padding,
@@ -166,9 +193,6 @@ export function renderBadge(
     cornerRadius,
   } = cfg;
   const fontSize = 8;
-  const m = measureText(text, fontSize);
-  const width = Math.floor(padding.l) + m.width + Math.floor(padding.r);
-  const height = Math.floor(padding.t) + m.height + Math.floor(padding.b);
 
   canvas.width = width;
   canvas.height = height;
@@ -177,6 +201,13 @@ export function renderBadge(
   ctx.imageSmoothingEnabled = false;
   ctx.imageSmoothingQuality = "low";
   ctx.clearRect(0, 0, width, height);
+
+  // Verify Tiny5 font is loaded in this canvas context before drawing text
+  ctx.font = `${fontSize}px Tiny5`;
+  const probe = ctx.measureText(text || "X");
+  if (probe.width === 0 && text.length > 0) {
+    console.warn("Tiny5 font may not be loaded. Font metrics returned 0 width.");
+  }
 
   // Background gradient (supports N stops)
   const grad =
@@ -228,7 +259,6 @@ export function renderBadge(
     }
   }
 
-  return { width, height };
 }
 
 /** Convert hex (#rrggbb) to oklch components for the dynamic accent. */

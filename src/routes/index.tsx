@@ -4,7 +4,7 @@ import { Download } from "lucide-react";
 import { ControlPanel } from "@/components/ControlPanel";
 import { BadgeCanvas } from "@/components/BadgeCanvas";
 import type { BadgeConfig } from "@/lib/badge-utils";
-import { hexToOklch, renderBadge } from "@/lib/badge-utils";
+import { hexToOklch, renderBadge, computeDimensions } from "@/lib/badge-utils";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -42,9 +42,9 @@ function Index() {
   }, [config.gradientStops]);
 
   const handleDownload = () => {
-    // Export at native (1×) pixel size — these are tiny pixel-art badges.
     const off = document.createElement("canvas");
-    renderBadge(off, config);
+    const dims = computeDimensions(config);
+    renderBadge(off, config, dims.width, dims.height);
     const url = off.toDataURL("image/png");
     const a = document.createElement("a");
     a.href = url;
