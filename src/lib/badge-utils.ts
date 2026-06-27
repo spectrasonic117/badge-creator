@@ -21,12 +21,12 @@ export type BadgeConfig = {
   cornerRadius: number;
 };
 
-const LETTER_GAP = 1;
+const LETTER_GAP = 0;
 const TEXT_ALPHA_THRESHOLD = 200;
 const SHADOW_ALPHA_THRESHOLD = 128;
 
 function getCharAdvance(ctx: CanvasRenderingContext2D, ch: string): number {
-  return Math.ceil(ctx.measureText(ch).width);
+  return Math.round(ctx.measureText(ch).width);
 }
 
 /**
